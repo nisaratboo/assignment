@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waste Detector AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;600&family=Archivo:wdth,wght@62..125,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f1f8f4;--panel:#ffffff;--fg:#10281c;--muted:#566b5f;--line:#d6e6dc;
+  --accent:#1f8a5b;--accent-soft:#e2f4ea;--accent-fg:#ffffff;--ok:#0f9d6b;--warn:#d4561a;
+  --court:#d9efe2;--court-line:rgba(31,138,91,.38);--court-fg:#10281c;
+  --shadow:0 1px 2px rgba(16,40,28,.05),0 8px 24px -12px rgba(31,138,91,.25);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;color:var(--fg);
+  background:
+    radial-gradient(900px 420px at 8% -10%,#d4f0e0 0,transparent 60%),
+    radial-gradient(700px 380px at 100% 0,#fff1d6 0,transparent 55%),
+    var(--bg);
+  background-attachment:fixed;
+  font:15px/1.6 "Anuphan",system-ui,sans-serif;
+  padding-block:28px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+
+header{display:flex;flex-direction:column;gap:8px}
+.title-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+h1{
+  margin:0;font-family:"Archivo","Anuphan",sans-serif;font-weight:800;font-stretch:68%;
+  font-size:clamp(2.4rem,7vw,4rem);line-height:1;letter-spacing:.005em;text-wrap:balance;
+  color:var(--fg);
+}
+p.sub{margin:0;color:var(--muted);max-width:62ch}
+
+.app{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:820px){.app{grid-template-columns:minmax(0,1fr)}}
+
+.rail{display:flex;flex-direction:column;gap:20px;position:sticky;top:16px}
+@media (max-width:820px){.rail{position:static}}
+.main{display:flex;flex-direction:column;gap:16px;min-width:0}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0;box-shadow:var(--shadow)}
+.card h2{margin:0;font-size:1rem;font-weight:600}
+.field{display:flex;flex-direction:column;gap:6px}
+.hint{color:var(--muted);font-size:13px;line-height:1.5}
+
+label.btn,button{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  background:var(--accent);color:var(--accent-fg);border:1px solid transparent;border-radius:999px;
+  padding:9px 17px;font:600 14px "Anuphan",sans-serif;cursor:pointer;
+  transition:filter .15s,background-color .15s,border-color .15s;
+}
+label.btn:hover,button:hover:not(:disabled){filter:brightness(1.08)}
+button.ghost,label.btn.ghost{background:var(--panel);color:var(--accent);border-color:var(--line)}
+button.ghost:hover:not(:disabled),label.btn.ghost:hover{border-color:var(--accent);background:var(--accent-soft);filter:none}
+button.link{background:none;border:0;padding:2px 0;color:var(--muted);font-weight:400;font-size:13px;text-decoration:underline;text-underline-offset:3px;align-self:flex-start;border-radius:0}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type=file]{display:none}
+input[type=text]{
+  width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:10px;
+  padding:9px 10px;font:13px "JetBrains Mono",monospace;
+}
+input[type=text]:focus{border-color:var(--accent)}
+
+.classes{display:flex;flex-direction:column;gap:8px}
+.cls-row{display:flex;align-items:center;gap:10px}
+.cls-row i{flex:none;width:14px;height:14px;border-radius:50%;box-shadow:inset -2px -2px 0 rgba(0,0,0,.14)}
+.cls-row .idx{flex:none;width:1.2ch;font:600 13px "JetBrains Mono",monospace;color:var(--muted)}
+.cls-row input{flex:1;min-width:0}
+
+.pill{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5;color:var(--muted);word-break:break-word}
+.pill::before{content:"";flex:none;width:9px;height:9px;margin-top:6px;border-radius:50%;background:var(--muted)}
+.pill.ok{color:var(--fg)}
+.pill.ok::before{background:var(--ok)}
+.pill.err{color:var(--warn)}
+.pill.err::before{background:var(--warn)}
+
+.conf-row{display:flex;align-items:center;gap:12px}
+input[type=range]{accent-color:var(--accent);flex:1;min-width:0}
+.conf-val{font:600 22px "Archivo","Anuphan",sans-serif;font-stretch:75%;min-width:3ch;text-align:right;font-variant-numeric:tabular-nums;color:var(--accent)}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap}
+
+.stage{
+  position:relative;background:var(--court);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  display:grid;place-items:center;min-height:490px;box-shadow:var(--shadow);
+}
+.stage.drag{outline:3px dashed var(--accent);outline-offset:-10px}
+.stage canvas{max-width:100%;height:auto;display:block}
+.empty{
+  position:absolute;inset:0;display:grid;place-items:center;text-align:center;cursor:pointer;
+  color:var(--court-fg);padding:24px;
+}
+.empty svg{position:absolute;inset:14px;width:calc(100% - 28px);height:calc(100% - 28px)}
+.empty svg *{fill:none;stroke:var(--court-line);stroke-width:2;vector-effect:non-scaling-stroke}
+.empty .msg{position:relative;display:flex;flex-direction:column;gap:4px;background:var(--panel);padding:14px 22px;border-radius:12px;box-shadow:var(--shadow)}
+.empty b{font-size:1.1rem;font-weight:600}
+.empty span{font-size:13px;color:var(--muted)}
+
+.status{color:var(--muted);font-size:14px;min-height:1.6em}
+.status.err{color:var(--warn)}
+
+.tablewrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+thead th{background:var(--accent-soft)}
+tbody tr:last-child td{border-bottom:0}
+th{color:var(--muted);font-weight:600;font-size:12px}
+.sw{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:8px;vertical-align:-1px}
+.bar{display:inline-block;width:64px;height:6px;border-radius:3px;background:var(--line);margin-left:10px;vertical-align:middle;overflow:hidden}
+.bar i{display:block;height:100%}
+.mono{font-family:"JetBrains Mono",monospace;font-size:13px}
+
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title-row">
+      <h1>Waste Detector AI</h1>
+    </div>
+    <p class="sub">ทายภาพขยะ glass, metal, paper และ plastic ด้วยโมเดล YOLO segment (Polygon) ทำงานในเบราว์เซอร์ทั้งหมด</p>
+  </header>
+
+  <div class="app">
+    <aside class="rail">
+      <section class="card">
+        <h2>โมเดล</h2>
+        <div id="modelStatus" class="pill">กำลังโหลดโมเดลอัตโนมัติ…</div>
+        <div class="toolbar">
+          <label class="btn ghost" for="modelFile">เลือกไฟล์ .onnx</label>
+          <input id="modelFile" type="file" accept=".onnx">
+        </div>
+        <button id="clearModel" class="link" type="button">ล้างโมเดลที่จำไว้</button>
+      </section>
+
+      <section class="card">
+        <h2>ตั้งค่าการทาย</h2>
+        <div class="field">
+          <label class="hint" for="conf">ความมั่นใจขั้นต่ำ</label>
+          <div class="conf-row">
+            <input id="conf" type="range" min="0.05" max="0.95" step="0.05" value="0.25">
+            <span id="confVal" class="conf-val">0.25</span>
+          </div>
+        </div>
+        <div class="field">
+          <span class="hint">ชื่อคลาส (ตามลำดับ index ของโมเดล)</span>
+          <div id="classes" class="classes">
+            <label class="cls-row"><i style="background:#2ec4b6"></i><span class="idx">0</span><input type="text" value="glass" aria-label="คลาส 0"></label>
+            <label class="cls-row"><i style="background:#7b6cf6"></i><span class="idx">1</span><input type="text" value="metal" aria-label="คลาส 1"></label>
+            <label class="cls-row"><i style="background:#ffd23f"></i><span class="idx">2</span><input type="text" value="paper" aria-label="คลาส 2"></label>
+            <label class="cls-row"><i style="background:#ff6b35"></i><span class="idx">3</span><input type="text" value="plastic" aria-label="คลาส 3"></label>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <section class="main">
+      <div class="toolbar">
+        <label class="btn" for="imgFile">เลือกรูป</label>
+        <input id="imgFile" type="file" accept="image/*">
+        <button id="runBtn" class="ghost" disabled>ทายอีกครั้ง</button>
+        <button id="savePng" class="ghost" disabled>บันทึกรูปผลลัพธ์</button>
+        <button id="saveJson" class="ghost" disabled>บันทึก polygon (JSON)</button>
+      </div>
+
+      <div class="stage" id="stage">
+        <label class="empty" for="imgFile">
+          <svg viewBox="0 0 400 240" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="0" y="0" width="400" height="240"/>
+            <line x1="200" y1="0" x2="200" y2="240"/>
+            <circle cx="200" cy="120" r="38"/>
+            <rect x="0" y="70" width="64" height="100"/>
+            <rect x="336" y="70" width="64" height="100"/>
+          </svg>
+          <span class="msg"><b>ลากรูปมาวางที่นี่</b><span>หรือกดเพื่อเลือกรูป หรือวางด้วย Ctrl+V</span></span>
+        </label>
+      </div>
+
+      <div id="runStatus" class="status" aria-live="polite"></div>
+
+      <div class="tablewrap" id="tblwrap" hidden>
+        <table id="tbl">
+          <thead><tr><th>#</th><th>คลาส</th><th>ความมั่นใจ</th><th>กรอบ (x1,y1,x2,y2)</th><th>จุด polygon</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script>
+(function(){
+const S=640, COLORS=['#2ec4b6','#7b6cf6','#ffd23f','#ff6b35','#ef476f','#06d6a0'];
+const $=id=>document.getElementById(id);
+let session=null, img=null, lastDets=[], canvas=null;
+ort.env.wasm.numThreads=1;
+
+const names=()=>[...document.querySelectorAll('#classes input')].map(i=>i.value.trim());
+const setModelStatus=(t,state)=>{$('modelStatus').textContent=t;$('modelStatus').className='pill'+(state?' '+state:'')};
+
+/* ---------- cache the model in the browser's IndexedDB ---------- */
+const DB='waste-detector-ai',STORE='kv';
+function idb(){
+  return new Promise((res,rej)=>{
+    const q=indexedDB.open(DB,1);
+    q.onupgradeneeded=()=>q.result.createObjectStore(STORE);
+    q.onsuccess=()=>res(q.result);
+    q.onerror=()=>rej(q.error);
+  });
+}
+async function idbGet(key){
+  try{
+    const db=await idb();
+    return await new Promise((res,rej)=>{const r=db.transaction(STORE).objectStore(STORE).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+  }catch(e){return undefined}
+}
+async function idbSet(key,val){
+  try{
+    const db=await idb();
+    await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(val,key);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});
+    return true;
+  }catch(e){return false}
+}
+async function idbDel(key){
+  try{
+    const db=await idb();
+    await new Promise((res,rej)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(key);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});
+  }catch(e){}
+}
+
+/* ---------- load the model ---------- */
+async function loadModel(buf,label){
+  try{
+    setModelStatus('กำลังโหลดโมเดล…');
+    session=await ort.InferenceSession.create(buf,{executionProviders:['wasm']});
+    setModelStatus('โหลดแล้ว: '+label+' | outputs: '+session.outputNames.join(', '),'ok');
+    $('runBtn').disabled=!img;
+    if(img) run();
+    return true;
+  }catch(err){session=null;setModelStatus('โหลดโมเดลไม่ได้ ('+label+'): '+err.message,'err');return false}
+}
+
+async function fetchBuf(url){
+  const r=await fetch(url,{cache:'no-cache'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r.arrayBuffer();
+}
+
+async function autoLoad(){
+  for(const u of ['best.onnx']){
+    try{
+      setModelStatus('กำลังดึงโมเดลจาก '+u+' …');
+      const buf=await fetchBuf(u);
+      if(await loadModel(buf,u)){
+        idbSet('model',{name:u,buf});
+        return;
+      }
+    }catch(e){/* try the next source */}
+  }
+  const saved=await idbGet('model');
+  if(saved&&saved.buf){
+    await loadModel(saved.buf,saved.name);
+    return;
+  }
+  setModelStatus('ยังไม่มีโมเดล: เลือกไฟล์ .onnx ครั้งเดียว (ครั้งต่อไปจะโหลดเองอัตโนมัติ) หรือวาง best.onnx ไว้ข้าง index.html','err');
+}
+
+$('modelFile').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const buf=await f.arrayBuffer();
+  if(await loadModel(buf,f.name)){
+    const ok=await idbSet('model',{name:f.name,buf});
+    if(ok) setModelStatus('โหลดแล้ว: '+f.name+' (จำไว้แล้ว รอบหน้าไม่ต้องเลือกซ้ำ) | outputs: '+session.outputNames.join(', '),'ok');
+  }
+});
+$('clearModel').addEventListener('click',async()=>{
+  await idbDel('model');
+  setModelStatus('ล้างโมเดลที่จำไว้แล้ว');
+});
+autoLoad();
+
+$('conf').addEventListener('input',()=>{$('confVal').textContent=(+$('conf').value).toFixed(2)});
+$('conf').addEventListener('change',()=>{if(img&&session) run()});
+$('classes').addEventListener('change',()=>{if(img&&session) run()});
+$('runBtn').addEventListener('click',()=>run());
+
+/* ---------- load the picture: file picker, drag and drop, paste ---------- */
+function loadImage(f){
+  if(!f||!f.type.startsWith('image/')) return;
+  const im=new Image();
+  im.onload=()=>{img=im;$('runBtn').disabled=!session; if(session) run(); else drawPlain()};
+  im.src=URL.createObjectURL(f);
+}
+$('imgFile').addEventListener('change',e=>{loadImage(e.target.files[0]);e.target.value=''});
+const stage=$('stage');
+['dragenter','dragover'].forEach(t=>stage.addEventListener(t,e=>{e.preventDefault();stage.classList.add('drag')}));
+['dragleave','drop'].forEach(t=>stage.addEventListener(t,e=>{e.preventDefault();stage.classList.remove('drag')}));
+stage.addEventListener('drop',e=>loadImage(e.dataTransfer.files[0]));
+document.addEventListener('paste',e=>{
+  const item=[...(e.clipboardData?e.clipboardData.items:[])].find(i=>i.type.startsWith('image/'));
+  if(item) loadImage(item.getAsFile());
+});
+
+function drawPlain(){
+  canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+  canvas.getContext('2d').drawImage(img,0,0);
+  $('stage').replaceChildren(canvas);
+}
+
+function preprocess(){
+  const c=document.createElement('canvas');c.width=c.height=S;
+  const x=c.getContext('2d',{willReadFrequently:true});
+  x.fillStyle='rgb(114,114,114)';x.fillRect(0,0,S,S);
+  const w=img.naturalWidth,h=img.naturalHeight,r=Math.min(S/w,S/h);
+  const nw=Math.round(w*r),nh=Math.round(h*r),dx=Math.floor((S-nw)/2),dy=Math.floor((S-nh)/2);
+  x.drawImage(img,0,0,w,h,dx,dy,nw,nh);
+  const d=x.getImageData(0,0,S,S).data,n=S*S,t=new Float32Array(3*n);
+  for(let i=0;i<n;i++){t[i]=d[i*4]/255;t[n+i]=d[i*4+1]/255;t[2*n+i]=d[i*4+2]/255}
+  return {tensor:new ort.Tensor('float32',t,[1,3,S,S]),r,dx,dy};
+}
+
+function iou(a,b){
+  const x1=Math.max(a[0],b[0]),y1=Math.max(a[1],b[1]),x2=Math.min(a[2],b[2]),y2=Math.min(a[3],b[3]);
+  const i=Math.max(0,x2-x1)*Math.max(0,y2-y1);
+  return i/((a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-i+1e-9);
+}
+function nms(dets,thr){
+  dets.sort((a,b)=>b.score-a.score);const keep=[];
+  for(const d of dets){if(keep.every(k=>k.cls!==d.cls||iou(k.box,d.box)<thr)) keep.push(d)}
+  return keep;
+}
+
+function decode(outs,conf){
+  let protos=null,main=null;
+  for(const k of session.outputNames){const t=outs[k];if(t.dims.length===4) protos=t;else main=t}
+  const [,a,b]=main.dims,data=main.data,dets=[];
+  const nm=protos?protos.dims[1]:0;
+  if(b<=nm+10 || b<=64){            // end-to-end (NMS-free): [1,N,6+nm]
+    for(let i=0;i<a;i++){
+      const o=i*b,score=data[o+4];if(score<conf) continue;
+      dets.push({box:[data[o],data[o+1],data[o+2],data[o+3]],score,cls:Math.round(data[o+5]),coef:nm?data.slice(o+6,o+6+nm):null});
+    }
+    return {dets,protos,nm};
+  }
+  const nc=a-4-nm;                  // classic: [1,4+nc+nm,anchors]
+  for(let i=0;i<b;i++){
+    let best=-1,bs=0;
+    for(let c=0;c<nc;c++){const s=data[(4+c)*b+i];if(s>bs){bs=s;best=c}}
+    if(bs<conf) continue;
+    const cx=data[i],cy=data[b+i],w=data[2*b+i],h=data[3*b+i];
+    let coef=null;if(nm){coef=new Float32Array(nm);for(let m=0;m<nm;m++) coef[m]=data[(4+nc+m)*b+i]}
+    dets.push({box:[cx-w/2,cy-h/2,cx+w/2,cy+h/2],score:bs,cls:best,coef});
+  }
+  return {dets:nms(dets,0.7),protos,nm};
+}
+
+function makeMask(det,protos,nm){
+  const mh=protos.dims[2],mw=protos.dims[3],p=protos.data,sc=mw/S;
+  const x1=Math.max(0,Math.floor(det.box[0]*sc)),y1=Math.max(0,Math.floor(det.box[1]*sc));
+  const x2=Math.min(mw,Math.ceil(det.box[2]*sc)),y2=Math.min(mh,Math.ceil(det.box[3]*sc));
+  const m=new Uint8Array(mw*mh),area=mw*mh;
+  for(let y=y1;y<y2;y++)for(let x=x1;x<x2;x++){
+    let s=0,idx=y*mw+x;
+    for(let k=0;k<nm;k++) s+=det.coef[k]*p[k*area+idx];
+    if(1/(1+Math.exp(-s))>0.5) m[idx]=1;
+  }
+  return {m,mw,mh};
+}
+
+function trace(m,w,h){            // Moore-neighbour outer contour
+  const D=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+  let sx=-1,sy=-1;
+  outer:for(let y=0;y<h;y++)for(let x=0;x<w;x++) if(m[y*w+x]){sx=x;sy=y;break outer}
+  if(sx<0) return [];
+  const pts=[[sx,sy]];let cx=sx,cy=sy,prev=6;
+  for(let it=0;it<20000;it++){
+    let moved=false;
+    for(let k=0;k<8;k++){
+      const d=(prev+6+k)%8,nx=cx+D[d][0],ny=cy+D[d][1];
+      if(nx>=0&&ny>=0&&nx<w&&ny<h&&m[ny*w+nx]){cx=nx;cy=ny;prev=d;moved=true;break}
+    }
+    if(!moved||(cx===sx&&cy===sy)) break;
+    pts.push([cx,cy]);
+  }
+  return pts;
+}
+function dp(pts,eps){
+  if(pts.length<4) return pts;
+  const [ax,ay]=pts[0],[bx,by]=pts[pts.length-1],dx=bx-ax,dy=by-ay,L=Math.hypot(dx,dy)||1;
+  let md=0,mi=0;
+  for(let i=1;i<pts.length-1;i++){
+    const d=Math.abs(dy*pts[i][0]-dx*pts[i][1]+bx*ay-by*ax)/L;if(d>md){md=d;mi=i}
+  }
+  if(md<=eps) return [pts[0],pts[pts.length-1]];
+  return dp(pts.slice(0,mi+1),eps).slice(0,-1).concat(dp(pts.slice(mi),eps));
+}
+
+async function run(){
+  if(!session||!img) return;
+  $('runStatus').textContent='กำลังทาย…';$('runStatus').className='status';
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    const t0=performance.now();
+    const {tensor,r,dx,dy}=preprocess();
+    const outs=await session.run({[session.inputNames[0]]:tensor});
+    const {dets,protos,nm}=decode(outs,+$('conf').value);
+    const ms=performance.now()-t0,W=img.naturalWidth,H=img.naturalHeight,N=names();
+    canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+    const g=canvas.getContext('2d');g.drawImage(img,0,0);
+    const lw=Math.max(2,Math.round(Math.max(W,H)/320));
+    lastDets=[];
+    dets.forEach((d,i)=>{
+      const col=COLORS[d.cls%COLORS.length];
+      const bx=d.box.map((v,j)=>((v-(j%2?dy:dx))/r));
+      const bb=[Math.max(0,bx[0]),Math.max(0,bx[1]),Math.min(W,bx[2]),Math.min(H,bx[3])];
+      let poly=[];
+      if(protos&&d.coef){
+        const {m,mw,mh}=makeMask(d,protos,nm);
+        const mc=document.createElement('canvas');mc.width=mw;mc.height=mh;
+        const mx=mc.getContext('2d'),id=mx.createImageData(mw,mh);
+        const rgb=[parseInt(col.slice(1,3),16),parseInt(col.slice(3,5),16),parseInt(col.slice(5,7),16)];
+        for(let k=0;k<m.length;k++) if(m[k]){id.data[k*4]=rgb[0];id.data[k*4+1]=rgb[1];id.data[k*4+2]=rgb[2];id.data[k*4+3]=110}
+        mx.putImageData(id,0,0);
+        g.imageSmoothingEnabled=true;
+        g.drawImage(mc,0,0,mw,mh,-dx/r,-dy/r,S/r,S/r);
+        const raw=dp(trace(m,mw,mh),1.0),k=S/mw;
+        poly=raw.map(([px,py])=>[+(((px+0.5)*k-dx)/r).toFixed(1),+(((py+0.5)*k-dy)/r).toFixed(1)]);
+        if(poly.length>2){
+          g.beginPath();poly.forEach(([x,y],j)=>j?g.lineTo(x,y):g.moveTo(x,y));g.closePath();
+          g.lineWidth=lw;g.strokeStyle=col;g.stroke();
+        }
+      }
+      g.lineWidth=Math.max(1,lw-1);g.strokeStyle=col;g.strokeRect(bb[0],bb[1],bb[2]-bb[0],bb[3]-bb[1]);
+      const label=(N[d.cls]||('class '+d.cls))+' '+d.score.toFixed(2),fs=Math.max(13,Math.round(Math.max(W,H)/45));
+      g.font='600 '+fs+'px sans-serif';const tw=g.measureText(label).width+10;
+      const ly=bb[1]-fs-6<0?bb[1]:bb[1]-fs-6;
+      g.fillStyle=col;g.fillRect(bb[0],ly,tw,fs+6);g.fillStyle='#000';g.fillText(label,bb[0]+5,ly+fs);
+      lastDets.push({id:i+1,class:N[d.cls]||d.cls,score:+d.score.toFixed(4),bbox:bb.map(v=>+v.toFixed(1)),polygon:poly,color:col});
+    });
+    $('stage').replaceChildren(canvas);
+    const tb=document.querySelector('#tbl tbody');tb.replaceChildren();
+    lastDets.forEach(d=>{
+      const tr=document.createElement('tr');
+      [d.id,null,(d.score*100).toFixed(1)+'%',d.bbox.map(Math.round).join(', '),d.polygon.length||'-'].forEach((v,j)=>{
+        const td=document.createElement('td');
+        if(j===1){const s=document.createElement('span');s.className='sw';s.style.background=d.color;td.append(s,String(d.class))}
+        else if(j===2){
+          const b=document.createElement('span');b.className='bar';
+          const f=document.createElement('i');f.style.width=(d.score*100)+'%';f.style.background=d.color;b.append(f);
+          td.append(v,b);td.className='mono';
+        }
+        else td.textContent=v;
+        if(j>=3) td.className='mono';
+        tr.append(td);
+      });tb.append(tr);
+    });
+    $('tblwrap').hidden=!lastDets.length;
+    $('runStatus').textContent=lastDets.length?('พบ '+lastDets.length+' วัตถุ ใช้เวลา '+ms.toFixed(0)+' ms'):'ไม่พบวัตถุ ลองลดค่าความมั่นใจขั้นต่ำ';
+    $('savePng').disabled=$('saveJson').disabled=false;
+  }catch(err){
+    $('runStatus').textContent='ผิดพลาด: '+err.message;$('runStatus').className='status err';
+  }
+}
+
+function dl(href,name){const a=document.createElement('a');a.href=href;a.download=name;a.click()}
+$('savePng').addEventListener('click',()=>canvas&&canvas.toBlob(b=>dl(URL.createObjectURL(b),'prediction.png')));
+$('saveJson').addEventListener('click',()=>{
+  dl(URL.createObjectURL(new Blob([JSON.stringify({image:{w:img.naturalWidth,h:img.naturalHeight},detections:lastDets},null,2)],{type:'application/json'})),'polygons.json');
+});
+})();
+</script>
+</body>
+</html>
