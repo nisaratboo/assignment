@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ทดสอบโมเดล YOLO26-seg</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#181b22; --line:#2a2f3a; --text:#e8eaf0; --mute:#8b93a7; --acc:#4cc38a; --warn:#f2b84b; --err:#ef6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI","Noto Sans Thai",sans-serif}
+  header{padding:18px 20px 6px}
+  h1{margin:0;font-size:20px}
+  header p{margin:2px 0 0;color:var(--mute);font-size:13px}
+  main{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:14px 20px 28px;max-width:1500px;margin:0 auto}
+  @media(max-width:900px){main{grid-template-columns:1fr;padding:12px 16px 24px}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .panel h2{margin:0 0 10px;font-size:13px;letter-spacing:.04em;color:var(--mute);font-weight:600;text-transform:uppercase}
+  .stack{display:flex;flex-direction:column;gap:14px}
+  button,.btn{background:#232836;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+  button:hover,.btn:hover{border-color:#3b4254}
+  button.primary{background:var(--acc);color:#07140d;border-color:var(--acc);font-weight:600}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  input[type=file]{display:none}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  label.s{display:block;font-size:13px;color:var(--mute);margin-top:10px}
+  label.s b{color:var(--text);font-weight:600;float:right}
+  input[type=range]{width:100%;accent-color:var(--acc)}
+  input[type=text]{width:100%;background:#10131a;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:7px 10px;font:inherit}
+  .status{font-size:13px;padding:8px 10px;border-radius:8px;background:#10131a;border:1px solid var(--line);color:var(--mute);word-break:break-word}
+  .status.ok{color:var(--acc)} .status.err{color:var(--err)} .status.busy{color:var(--warn)}
+  #stage{position:relative;min-height:320px;display:flex;align-items:center;justify-content:center;background:
+     repeating-conic-gradient(#14171d 0 25%,#12151b 0 50%) 0 0/24px 24px;border-radius:10px;overflow:hidden}
+  #stage.drag{outline:2px dashed var(--acc);outline-offset:-6px}
+  canvas{max-width:100%;height:auto;display:block}
+  #hint{position:absolute;color:var(--mute);text-align:center;padding:20px;pointer-events:none}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .chip{display:flex;align-items:center;gap:6px;background:#10131a;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+  th,td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--mute);font-weight:600}
+  td.n{font-variant-numeric:tabular-nums}
+  .meta{display:flex;gap:16px;flex-wrap:wrap;color:var(--mute);font-size:13px;margin-top:10px}
+  .meta b{color:var(--text);font-weight:600}
+  .check{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px}
+  .check input{accent-color:var(--acc)}
+</style>
+</head>
+<body>
+<header>
+  <h1>ทดสอบผลเทรน YOLO26-seg</h1>
+  <p>รันโมเดล ONNX ในเบราว์เซอร์ล้วน ๆ ไม่อัปโหลดรูปไปไหน</p>
+</header>
+
+<main>
+  <div class="stack">
+    <section class="panel">
+      <h2>1 · โมเดล</h2>
+      <div class="row">
+        <label class="btn" for="modelFile">เลือกไฟล์ best.onnx</label>
+        <input id="modelFile" type="file" accept=".onnx">
+      </div>
+      <div id="modelStatus" class="status" style="margin-top:10px">ยังไม่ได้โหลดโมเดล</div>
+      <label class="s">ชื่อคลาส (คั่นด้วยจุลภาค ตามลำดับ id)</label>
+      <input id="names" type="text" value="bottle, glass, metal, paper">
+    </section>
+
+    <section class="panel">
+      <h2>2 · ภาพทดสอบ</h2>
+      <div class="row">
+        <label class="btn" for="imgFile">เลือกรูป</label>
+        <input id="imgFile" type="file" accept="image/*" multiple>
+        <button id="camBtn">เปิดกล้อง</button>
+      </div>
+      <div class="row" id="navRow" style="margin-top:10px;display:none">
+        <button id="prev">◀</button><span id="navTxt" style="font-size:13px;color:var(--mute)"></span><button id="next">▶</button>
+      </div>
+      <p style="font-size:12px;color:var(--mute);margin:10px 0 0">หรือลากรูปมาวางในกรอบด้านขวา / วางรูปจากคลิปบอร์ด (Ctrl+V)</p>
+    </section>
+
+    <section class="panel">
+      <h2>3 · ค่าปรับ</h2>
+      <label class="s">Confidence <b id="confV">0.25</b></label>
+      <input id="conf" type="range" min="0.01" max="0.95" step="0.01" value="0.25">
+      <label class="s">IoU (NMS) <b id="iouV">0.45</b></label>
+      <input id="iou" type="range" min="0.05" max="0.95" step="0.01" value="0.45">
+      <label class="check"><input id="showMask" type="checkbox" checked> แสดง mask</label>
+      <label class="check"><input id="showBox" type="checkbox" checked> แสดงกรอบ + ป้ายชื่อ</label>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <div id="stage">
+        <div id="hint">โหลดโมเดลก่อน แล้วเลือกรูปหรือลากรูปมาวางที่นี่</div>
+        <canvas id="cv" width="0" height="0"></canvas>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="meta" id="meta"></div>
+    </section>
+    <section class="panel">
+      <h2>ผลตรวจจับ</h2>
+      <table id="tbl"><thead><tr><th>#</th><th>คลาส</th><th>ความมั่นใจ</th><th>กรอบ (x, y, w, h) px</th></tr></thead><tbody></tbody></table>
+    </section>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const SZ = 640;
+  let session = null, detName = null, protoName = null;
+  let source = null;            // {el, w, h}
+  let cache = null;             // raw model outputs + letterbox params for re-postprocessing
+  let files = [], fileIdx = 0;
+  let camStream = null, camVideo = null, camRunning = false;
+  let busy = false;
+
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  const setStatus = (t, cls='') => { const e = $('modelStatus'); e.textContent = t; e.className = 'status ' + cls; };
+  const names = () => $('names').value.split(',').map(s => s.trim()).filter(Boolean);
+  const color = i => `hsl(${(i * 83 + 140) % 360} 78% 58%)`;
+
+  /* ---------------- model ---------------- */
+  async function loadModel(buf, label) {
+    if (typeof ort === 'undefined') { setStatus('โหลด onnxruntime-web ไม่สำเร็จ (ต้องต่ออินเทอร์เน็ตเพื่อดึงจาก CDN)', 'err'); return; }
+    setStatus('กำลังโหลดโมเดล…', 'busy');
+    try {
+      session = await ort.InferenceSession.create(buf, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+      detName = protoName = null;
+      // จำแนก output จากจำนวนมิติ: 3 มิติ = detection, 4 มิติ = proto mask
+      const probe = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', new Float32Array(3 * SZ * SZ), [1, 3, SZ, SZ]) });
+      for (const k of session.outputNames) {
+        if (probe[k].dims.length === 3) detName = k; else if (probe[k].dims.length === 4) protoName = k;
+      }
+      if (!detName || !protoName) throw new Error('โมเดลนี้ไม่ใช่ segmentation (ต้องมี output 2 ตัว)');
+      const d = probe[detName].dims, p = probe[protoName].dims;
+      const nm = p[1], nc = d[1] - 4 - nm;
+      setStatus(`โหลดแล้ว: ${label}\ninput ${SZ}×${SZ} · ${nc} คลาส · mask ${p[2]}×${p[3]}`, 'ok');
+      if (names().length !== nc) setStatus(`โหลดแล้ว แต่โมเดลมี ${nc} คลาส ขณะที่ช่องชื่อคลาสมี ${names().length} ชื่อ — โปรดแก้ให้ตรงกัน`, 'busy');
+      cache = null;
+      if (source) run();
+    } catch (e) {
+      session = null; setStatus('โหลดโมเดลไม่สำเร็จ: ' + e.message, 'err');
+    }
+  }
+  $('modelFile').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    loadModel(new Uint8Array(await f.arrayBuffer()), f.name);
+  });
+  // ถ้าเปิดผ่านเว็บเซิร์ฟเวอร์และมี best.onnx อยู่โฟลเดอร์เดียวกัน จะโหลดให้อัตโนมัติ
+  (async () => {
+    try {
+      const r = await fetch('best.onnx'); if (!r.ok) return;
+      loadModel(new Uint8Array(await r.arrayBuffer()), 'best.onnx (โฟลเดอร์เดียวกัน)');
+    } catch {}
+  })();
+
+  /* ---------------- input ---------------- */
+  function setSource(el, w, h) { source = { el, w, h }; $('hint').style.display = 'none'; run(); }
+  function loadFile(f) {
+    const img = new Image();
+    img.onload = () => setSource(img, img.naturalWidth, img.naturalHeight);
+    img.src = URL.createObjectURL(f);
+  }
+  function showNav() {
+    $('navRow').style.display = files.length > 1 ? 'flex' : 'none';
+    $('navTxt').textContent = `${fileIdx + 1} / ${files.length}  ·  ${files[fileIdx]?.name || ''}`;
+  }
+  $('imgFile').addEventListener('change', e => {
+    stopCam(); files = [...e.target.files]; fileIdx = 0; if (!files.length) return; showNav(); loadFile(files[0]);
+  });
+  $('prev').onclick = () => { fileIdx = (fileIdx - 1 + files.length) % files.length; showNav(); loadFile(files[fileIdx]); };
+  $('next').onclick = () => { fileIdx = (fileIdx + 1) % files.length; showNav(); loadFile(files[fileIdx]); };
+
+  const stage = $('stage');
+  ['dragenter', 'dragover'].forEach(t => stage.addEventListener(t, e => { e.preventDefault(); stage.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(t => stage.addEventListener(t, e => { e.preventDefault(); stage.classList.remove('drag'); }));
+  stage.addEventListener('drop', e => {
+    const fs = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/')); if (!fs.length) return;
+    stopCam(); files = fs; fileIdx = 0; showNav(); loadFile(fs[0]);
+  });
+  window.addEventListener('paste', e => {
+    const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (!f) return;
+    stopCam(); files = [f]; fileIdx = 0; showNav(); loadFile(f);
+  });
+
+  /* ---------------- camera ---------------- */
+  async function startCam() {
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } } });
+    } catch (e) { alert('เปิดกล้องไม่ได้: ' + e.message + '\n(กล้องต้องเปิดผ่าน https หรือ localhost)'); return; }
+    camVideo = document.createElement('video'); camVideo.srcObject = camStream; camVideo.muted = true; camVideo.playsInline = true;
+    await camVideo.play();
+    camRunning = true; $('camBtn').textContent = 'ปิดกล้อง'; $('hint').style.display = 'none';
+    camLoop();
+  }
+  function stopCam() {
+    camRunning = false; camStream?.getTracks().forEach(t => t.stop()); camStream = null; $('camBtn').textContent = 'เปิดกล้อง';
+  }
+  async function camLoop() {
+    while (camRunning) {
+      source = { el: camVideo, w: camVideo.videoWidth, h: camVideo.videoHeight };
+      await run(); await new Promise(r => requestAnimationFrame(r));
+    }
+  }
+  $('camBtn').onclick = () => camRunning ? stopCam() : startCam();
+
+  /* ---------------- inference ---------------- */
+  const lb = document.createElement('canvas'); lb.width = lb.height = SZ;
+  const lbx = lb.getContext('2d', { willReadFrequently: true });
+
+  async function run() {
+    if (!session) { if (!camRunning) setStatus(session ? '' : 'ยังไม่ได้โหลดโมเดล — เลือกไฟล์ best.onnx ก่อน', 'busy'); return; }
+    if (!source || busy) return;
+    busy = true;
+    try {
+      const { el, w, h } = source;
+      const r = Math.min(SZ / w, SZ / h);
+      const nw = Math.round(w * r), nh = Math.round(h * r);
+      const padX = (SZ - nw) / 2, padY = (SZ - nh) / 2;
+      lbx.fillStyle = 'rgb(114,114,114)'; lbx.fillRect(0, 0, SZ, SZ);
+      lbx.drawImage(el, 0, 0, w, h, Math.round(padX - 0.1), Math.round(padY - 0.1), nw, nh);
+      const px = lbx.getImageData(0, 0, SZ, SZ).data, A = SZ * SZ;
+      const input = new Float32Array(3 * A);
+      for (let i = 0, j = 0; i < A; i++, j += 4) {
+        input[i] = px[j] / 255; input[A + i] = px[j + 1] / 255; input[2 * A + i] = px[j + 2] / 255;
+      }
+      const t0 = performance.now();
+      const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', input, [1, 3, SZ, SZ]) });
+      const ms = performance.now() - t0;
+      const det = out[detName], proto = out[protoName];
+      cache = { det: det.data, dims: det.dims, proto: proto.data, pdims: proto.dims, r, padX, padY, w, h, ms, frame: snapshot(el, w, h) };
+      render();
+    } catch (e) {
+      console.error(e); setStatus('รันโมเดลไม่สำเร็จ: ' + e.message, 'err'); camRunning = false;
+    } finally { busy = false; }
+  }
+  // เก็บเฟรมไว้เพื่อให้ปรับ slider แล้ววาดใหม่ได้โดยไม่ต้อง infer ซ้ำ
+  function snapshot(el, w, h) {
+    const s = Math.min(1, 1600 / Math.max(w, h));
+    const c = document.createElement('canvas'); c.width = Math.round(w * s); c.height = Math.round(h * s);
+    c.getContext('2d').drawImage(el, 0, 0, c.width, c.height); return c;
+  }
+
+  /* ---------------- post-process ---------------- */
+  function postprocess(c, conf, iouThr) {
+    const [, C, N] = c.dims, nm = c.pdims[1], nc = C - 4 - nm, d = c.det;
+    const cand = [];
+    for (let i = 0; i < N; i++) {
+      let best = -1, bs = 0;
+      for (let k = 0; k < nc; k++) { const s = d[(4 + k) * N + i]; if (s > bs) { bs = s; best = k; } }
+      if (bs < conf) continue;
+      const cx = d[i], cy = d[N + i], bw = d[2 * N + i], bh = d[3 * N + i];
+      cand.push({ i, cls: best, score: bs, x1: cx - bw / 2, y1: cy - bh / 2, x2: cx + bw / 2, y2: cy + bh / 2 });
+    }
+    cand.sort((a, b) => b.score - a.score);
+    const keep = [];
+    for (const a of cand) {
+      let ok = true;
+      for (const b of keep) {
+        if (b.cls !== a.cls) continue;
+        const iw = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1), ih = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1);
+        if (iw <= 0 || ih <= 0) continue;
+        const inter = iw * ih, u = (a.x2 - a.x1) * (a.y2 - a.y1) + (b.x2 - b.x1) * (b.y2 - b.y1) - inter;
+        if (inter / u > iouThr) { ok = false; break; }
+      }
+      if (ok) keep.push(a);
+      if (keep.length >= 100) break;
+    }
+    return { keep, N, nm, nc };
+  }
+
+  /* ---------------- render ---------------- */
+  const off = document.createElement('canvas'); off.width = off.height = 160;
+  const offx = off.getContext('2d');
+
+  function render() {
+    if (!cache) return;
+    const c = cache, conf = +$('conf').value, iouThr = +$('iou').value;
+    const { keep, N, nm } = postprocess(c, conf, iouThr);
+    const nameList = names();
+    const W = c.frame.width, H = c.frame.height, ds = W / c.w;      // frame px ต่อ px ของภาพต้นฉบับ
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    ctx.drawImage(c.frame, 0, 0);
+
+    const ph = c.pdims[2], pw = c.pdims[3], pr = ph / SZ;           // proto px ต่อ px ของ letterbox
+    const proto = c.proto, d = c.det;
+
+    if ($('showMask').checked) {
+      for (const k of keep) {
+        const col = colorRGB(k.cls);
+        const bx1 = Math.max(0, Math.floor(k.x1 * pr)), by1 = Math.max(0, Math.floor(k.y1 * pr));
+        const bx2 = Math.min(pw, Math.ceil(k.x2 * pr)), by2 = Math.min(ph, Math.ceil(k.y2 * pr));
+        const coef = new Float32Array(nm); for (let m = 0; m < nm; m++) coef[m] = d[(4 + (c.dims[1] - 4 - nm) + m) * N + k.i];
+        const img = offx.createImageData(pw, ph), px = img.data;
+        for (let y = by1; y < by2; y++) for (let x = bx1; x < bx2; x++) {
+          let s = 0, p = y * pw + x;
+          for (let m = 0; m < nm; m++) s += coef[m] * proto[m * ph * pw + p];
+          if (s > 0) { const o = p * 4; px[o] = col[0]; px[o + 1] = col[1]; px[o + 2] = col[2]; px[o + 3] = 120; }   // sigmoid(s) > 0.5
+        }
+        offx.clearRect(0, 0, pw, ph); offx.putImageData(img, 0, 0);
+        // proto -> letterbox (×SZ/pw) -> ภาพต้นฉบับ ((x-pad)/r) -> frame (×ds)
+        const k2 = (SZ / pw) / c.r * ds;
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(off, 0, 0, pw, ph, -c.padX / c.r * ds, -c.padY / c.r * ds, pw * k2, ph * k2);
+      }
+    }
+
+    const lw = Math.max(2, W / 420), fs = Math.max(12, W / 55);
+    if ($('showBox').checked) {
+      ctx.lineWidth = lw; ctx.font = `600 ${fs}px system-ui,sans-serif`; ctx.textBaseline = 'top';
+      for (const k of keep) {
+        const x1 = (k.x1 - c.padX) / c.r * ds, y1 = (k.y1 - c.padY) / c.r * ds;
+        const x2 = (k.x2 - c.padX) / c.r * ds, y2 = (k.y2 - c.padY) / c.r * ds;
+        ctx.strokeStyle = color(k.cls); ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        const label = `${nameList[k.cls] ?? 'class ' + k.cls} ${(k.score * 100).toFixed(0)}%`;
+        const tw = ctx.measureText(label).width + 10, th = fs + 6, ty = y1 - th < 0 ? y1 : y1 - th;
+        ctx.fillStyle = color(k.cls); ctx.fillRect(x1 - lw / 2, ty, tw, th);
+        ctx.fillStyle = '#0b0d11'; ctx.fillText(label, x1 + 4, ty + 3);
+      }
+    }
+
+    // สรุปผล
+    const counts = {}; keep.forEach(k => counts[k.cls] = (counts[k.cls] || 0) + 1);
+    $('chips').innerHTML = keep.length
+      ? Object.keys(counts).sort((a, b) => a - b).map(i => `<span class="chip"><span class="dot" style="background:${color(+i)}"></span>${esc(nameList[i] ?? 'class ' + i)} × ${counts[i]}</span>`).join('')
+      : '<span class="chip">ไม่พบวัตถุที่ conf ≥ ' + conf.toFixed(2) + ' (ลองลดค่า Confidence)</span>';
+    $('meta').innerHTML = `<span>ภาพ <b>${c.w}×${c.h}</b></span><span>เวลา infer <b>${c.ms.toFixed(0)} ms</b></span><span>พบ <b>${keep.length}</b> ชิ้น</span>`;
+    $('tbl').tBodies[0].innerHTML = keep.map((k, n) => {
+      const x = (k.x1 - c.padX) / c.r, y = (k.y1 - c.padY) / c.r, w = (k.x2 - k.x1) / c.r, h = (k.y2 - k.y1) / c.r;
+      return `<tr><td class="n">${n + 1}</td><td><span class="dot" style="display:inline-block;background:${color(k.cls)};margin-right:6px"></span>${esc(nameList[k.cls] ?? 'class ' + k.cls)}</td><td class="n">${(k.score * 100).toFixed(1)}%</td><td class="n">${[x, y, w, h].map(v => Math.round(v)).join(', ')}</td></tr>`;
+    }).join('');
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  function colorRGB(i) {
+    const t = document.createElement('canvas').getContext('2d'); t.fillStyle = color(i); t.fillRect(0, 0, 1, 1);
+    const p = t.getImageData(0, 0, 1, 1).data; return [p[0], p[1], p[2]];
+  }
+
+  for (const id of ['conf', 'iou']) $(id).addEventListener('input', () => { $(id + 'V').textContent = (+$(id).value).toFixed(2); render(); });
+  for (const id of ['showMask', 'showBox']) $(id).addEventListener('change', render);
+  $('names').addEventListener('input', render);
+})();
+</script>
+</body>
+</html>
